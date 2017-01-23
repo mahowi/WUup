@@ -1,14 +1,13 @@
 #!/bin/bash
-rm controls_wuup.txt
-#find ./FHEM -type d \( ! -iname ".*" \) -print0 | while IFS= read -r -d '' f;
-#  do
-#   out="DIR $f"
-#   echo ${out//.\//} >> controls_wuup.txt
-#done
-find ./FHEM -type f \( ! -iname ".*" \) -print0 | while IFS= read -r -d '' f;
+CONTROL=controls_wuup.txt
+DIRS="./FHEM"
+
+rm $CONTROL
+
+find $DIRS -type f \( ! -iname ".*" \) -print0 | while IFS= read -r -d '' f;
   do
-   out="UPD "$(stat -f "%Sm" -t "%Y-%m-%d_%T" $f)" "$(stat -f%z $f)" ${f}"
-   echo ${out//.\//} >> controls_wuup.txt
+    out="UPD `stat --format "%z %s" $f | sed -e "s#\([0-9-]*\)\ \([0-9:]*\)\.[0-9]*\ [+0-9]*#\1_\2#"` $f"
+    echo ${out//.\//} >> $CONTROL
 done
 
 # CHANGED file
