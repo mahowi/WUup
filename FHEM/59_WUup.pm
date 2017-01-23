@@ -1,4 +1,4 @@
-# $Id: 59_WUup.pm 3 2017-01-23 13:17:58Z mahowi $
+# $Id: 59_WUup.pm 4 2017-01-23 13:17:58Z mahowi $
 ####################################################################################################
 #
 #    59_WUup.pm
@@ -111,7 +111,7 @@ sub WUup_send($) {
             $value = UConv::c2f($value);
         }
         elsif ( $key =~ /\w+mph.*/ ) {
-            $value = UCOnv::kph2mph($value);
+            $value = UConv::kph2mph($value);
         }
         elsif ( $key eq "baromin" ) {
             $value = UConv::hpa2inhg($value);
