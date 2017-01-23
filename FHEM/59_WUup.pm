@@ -1,6 +1,5 @@
 # $Id: 59_WUup.pm 4 2017-01-23 13:17:58Z mahowi $
-####################################################################################################
-#
+################################################################################
 #    59_WUup.pm
 #
 #    Copyright: mahowi
@@ -23,7 +22,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-####################################################################################################
+################################################################################
 
 package main;
 
@@ -34,11 +33,11 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-####################################################################################################
+################################################################################
 #
 # Main routines
 #
-####################################################################################################
+################################################################################
 
 sub WUup_Initialize($) {
     my ($hash) = @_;
@@ -49,9 +48,9 @@ sub WUup_Initialize($) {
         "disable:1,0 "
       . "wuInterval:60,180,300,600,1800,3600 "
       . "wuwinddir wuwindspeedmph wuwindgustmph wuwindgustdir wuwinddir_avg2m  "
-      . "wuwinddir_avg2m wuwindgustmph_10m wuwindgustdir_10m wuhumidity wudewptf "
-      . "wutempf wurainin wudailyrainin wubaromin wusoiltempf wusoilmoisture  "
-      . "wusolarradiation wuUV "
+      . "wuwinddir_avg2m wuwindgustmph_10m wuwindgustdir_10m wuhumidity "
+      . "wusoilmoisture wudewptf wutempf wurainin wudailyrainin wubaromin "
+      . "wusoiltempf wusolarradiation wuUV "
       . $readingFnAttributes;
 }
 
@@ -152,17 +151,17 @@ sub WUup_send($) {
 
 1;
 
-####################################################################################################
+################################################################################
 #
 # Documentation
 #
-####################################################################################################
+################################################################################
 #
-#	Changelog:
+# Changelog:
 #
 # 2017-01-23 initial release
 #
-####################################################################################################
+################################################################################
 
 =pod
 =item helper
@@ -179,7 +178,8 @@ sub WUup_send($) {
         <br/>
         <code>define &lt;name&gt; WUup &lt;stationId&gt; &lt;password&gt;</code>
         <br/><br/>
-        This module provides connection to <a href="https://www.wunderground.com">www.wunderground.com</a></br>
+        This module provides connection to 
+        <a href="https://www.wunderground.com">www.wunderground.com</a></br>
         to send data from your own weather station.<br/>
 
     </ul>
@@ -206,16 +206,23 @@ sub WUup_send($) {
     <ul>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         <br/>
-        <li><b>wuInterval</b> - Interval (seconds) to send data to www.wunderground.com 
+        <li><b>wuInterval</b> - Interval (seconds) to send data to 
+            www.wunderground.com. 
             Will be adjusted to 60 if set to a value lower than 60.</li>
-        <li><b>wu....</b> - Attribute name corresponding to <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">parameter name from api.</a> 
-            Each of this attributes contains information about weather data to be sent in format 
-            <code>sensorName:readingName[:offset]</code><br/>
-            Example: <code>attr WUup wutempf outside:temperature</code> will define the attribut wutempf and <br/>
-            reading "temperature" from device "outside" will be sent to network as parameter "tempf" (which indicates current temperature)<br/>
-            Units get converted to angloamerican system automatically (e.g. mph -> km/h)<br/>
+        <li><b>wu....</b> - Attribute name corresponding to 
+<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">parameter name from api.</a> 
+            Each of these attributes contains information about weather data to be sent 
+            in format <code>sensorName:readingName[:offset]</code><br/>
+            Example: <code>attr WUup wutempf outside:temperature</code> will 
+            define the attribut wutempf and <br/>
+            reading "temperature" from device "outside" will be sent to 
+            network as parameter "tempf" (which indicates current temperature)
+            <br/>
+            Units get converted to angloamerican system automatically 
+            (&deg;C -> &deg;F; km/h -> mph; mm -> in; hPa -> inHg)<br/>
             Optional Parameter "offset" will be added to the read value 
-            (e.g. sometimes necessary to send dewpoint - use offset 273.15 if needed in Kelvin)
+            (e.g. sometimes necessary to send dewpoint - use offset 273.15 if 
+            needed in Kelvin)
         </li>
     </ul>
     <br/><br/>
@@ -230,7 +237,8 @@ sub WUup_send($) {
 
     <b>Author's notes</b><br/><br/>
     <ul>
-        <li>Find complete api description <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">here</a></li>
+        <li>Find complete api description 
+<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">here</a></li>
         <li>Have fun!</li><br/>
     </ul>
 
@@ -243,7 +251,7 @@ sub WUup_send($) {
 <h3>WUup</h3>
 <ul>
 Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
-Die englische Doku gibt es hier: <a href='http://fhem.de/commandref.html#WUup'>WUup</a><br/>
+Die englische Doku gibt es hier: <a href='commandref.html#WUup'>WUup</a><br/>
 </ul>
 =end html_DE
 =cut
