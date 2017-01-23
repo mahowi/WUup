@@ -1,4 +1,4 @@
-# $Id: 59_WUup.pm 4 2017-01-23 13:17:58Z mahowi $
+# $Id: 59_WUup.pm 6 2017-01-23 20:22:35Z mahowi $
 ################################################################################
 #    59_WUup.pm
 #
@@ -90,7 +90,9 @@ sub WUup_send($) {
     my $url = $hash->{helper}{url};
     $url .= "?ID=" . $hash->{helper}{stationid};
     $url .= "&PASSWORD=" . $hash->{helper}{password};
-    $url .= "&dateutc=now";
+    my $datestring = strftime "%F+%T", gmtime;
+    $datestring =~ s/:/%3A/g;
+    $url .= "&dateutc=" . $datestring;
 
     $attr{$name}{wuInterval} = 60 if ( AttrVal( $name, "wuInterval", 0 ) < 60 );
     RemoveInternalTimer($hash);
@@ -126,8 +128,9 @@ sub WUup_send($) {
         readingsBulkUpdate( $hash, "data", $data );
         Log3( $name, 4, "WUup $name data sent: $data" );
         $url .= $data;
-        $url .= "&softwaretype=" . $hash->{helper}{softwareid};
+        $url .= "&softwaretype=" . $hash->{helper}{softwaretype};
         $url .= "&action=updateraw";
+        Log3( $name, 4, "WUup $name full URL: $url" );
         my $response = GetFileFromURL($url);
         readingsBulkUpdate( $hash, "response", $response );
         Log3( $name, 4, "WUup $name server response: $response" );
