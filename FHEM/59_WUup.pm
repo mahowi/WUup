@@ -1,4 +1,4 @@
-# $Id$
+# $Id: 59_WUup.pm 1 2017-01-23 10:17:58Z mahowi $
 ####################################################################################################
 #
 #	59_WUup.pm
@@ -45,9 +45,11 @@ sub WUup_Initialize($) {
 	$hash->{DefFn}			= "WUup_Define";
 	$hash->{UndefFn}		= "WUup_Undef";
 	$hash->{AttrList}	=	"disable:1,0 ".
-		"WUupInterval:600,1800,3600 WUuptest:true,false ".
-		"WUuphu WUupte WUupdp WUuppr WUuppcv WUuppcf WUupwd WUupws WUupwsbft WUupwg WUuppa ".
-		"WUuppai WUuppaest WUupuv WUupsd WUupsc WUupvi WUupch WUupcm WUupcl WUupdc WUupww ".
+		"wuInterval:60,180,300,600,1800,3600 wutest:true,false ".
+		"wuwinddir wuwindspeedmph wuwindgustmph wuwindgustdir wuwinddir_avg2m  ".
+		"wuwinddir_avg2m wuwindgustmph_10m wuwindgustdir_10m wuhumidity wudewptf ".
+		"wutempf wurainin wudailyrainin wubaromin wusoiltempf wusoilmoisture  ".
+		"wusolarradiation wuUV ".
 		$readingFnAttributes;
 }
 
@@ -59,9 +61,9 @@ sub WUup_Define($$$) {
 	my $name = $hash->{NAME};
 
 	$hash->{helper}{stationid}	= $a[2];
-	$hash->{helper}{password}		= $a[3];
-	$hash->{helper}{softwareid}	= 'fhem';
-	$hash->{helper}{url}				= "http://interface.wetterarchiv.de/weather/";
+	$hash->{helper}{password}	= $a[3];
+	$hash->{helper}{softwaretype}	= 'fhem';
+	$hash->{helper}{url}		= "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
 
 	Log3($name, 4, "WUup $name: created");
 	readingsSingleUpdate($hash, "state", "defined",1);
@@ -83,25 +85,32 @@ sub WUup_send($) {
 
 	$local = 0 unless(defined($local));
 	my $url = $hash->{helper}{url};
-	$url .= "?id=".		$hash->{helper}{stationid};
-	$url .= "&pwd=".	$hash->{helper}{password};
-	$url .= "&sid=".	$hash->{helper}{softwareid};
-	$url .= "&dtutc=".strftime "%Y%m%d%H%M", gmtime;
-	$url .= "&dt=".		strftime "%Y%m%d%H%M", localtime;
+	$url .= "?ID=".		$hash->{helper}{stationid};
+	$url .= "&PASSWORD=".	$hash->{helper}{password};
+	$url .= "&dateutc=now";
 
-	$attr{$name}{WUupInterval} = 600 if(AttrVal($name,"WUupInterval",0) < 600);
+	$attr{$name}{wuInterval} = 60 if(AttrVal($name,"wuInterval",0) < 60);
 	RemoveInternalTimer($hash);
 
 	my ($data, $d, $r, $o);
 	my $a = $attr{$name};
 	while ( my ($key, $value) = each($a) ) {
-		next if substr($key,0,4) ne 'WUup';
-		next if substr($key,4,1) ~~ ["I"];
-		$key = substr($key,4,length($key)-4);
+		next if substr($key,0,2) ne 'wu';
+		next if substr($key,2,1) ~~ ["I"];
+		$key = substr($key,2,length($key)-2);
 		($d, $r, $o) = split(":", $value);
 		if(defined($r)) {
 			$o     = (defined($o)) ? $o : 0;
 			$value = ReadingsVal($d, $r, 0) + $o;
+		}
+		if ($key =~ /\w+f$/) {
+			$value = UConv::c2f($value);
+		} elsif ($key =~ /\w+mph.*/) {
+			$value = UCOnv::kph2mph($value);
+		} elsif ($key eq "baromin") {
+			$value = UConv::hpa2inhg($value);
+		} elsif ($key =~ /.*rainin$/) {
+			$value = UConv::mm2in($value);
 		}
 		$data .= "&$key=$value";
 	}
@@ -111,6 +120,8 @@ sub WUup_send($) {
 		readingsBulkUpdate($hash, "data", $data);
 		Log3 ($name, 4, "WUup $name data sent: $data");
 		$url .= $data;
+		$url .= "&softwaretype=".	$hash->{helper}{softwareid};
+		$url .= "&action=updateraw";
 		my $response = GetFileFromURL($url);
 		readingsBulkUpdate($hash, "response", $response);
 		Log3 ($name, 4, "WUup $name server response: $response");
@@ -139,7 +150,7 @@ sub WUup_send($) {
 #
 #	Changelog:
 #
-# 2014-04-12 initial release
+# 2017-01-23 initial release
 #
 ####################################################################################################
 
@@ -158,7 +169,7 @@ sub WUup_send($) {
 		<br/>
 		<code>define &lt;name&gt; WUup &lt;stationId&gt; &lt;password&gt;</code>
 		<br/><br/>
-		This module provides connection to <a href="http://www.wetter.com">www.wetter.com</a></br>
+		This module provides connection to <a href="http://www.wunderground.com">www.wwunderground.com</a></br>
 		to send data from your own weather station.<br/>
 
 	</ul>
@@ -185,14 +196,15 @@ sub WUup_send($) {
 	<ul>
 		<li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 		<br/>
-		<li><b>WUupInterval</b> - Interval (seconds) to send data to www.wetter.com 
-				Will be adjusted to 600 if set to a value lower than 600.</li>
+		<li><b>WUupInterval</b> - Interval (seconds) to send data to www.wunderground.com 
+				Will be adjusted to 60 if set to a value lower than 60.</li>
 		<li><b>WUuptest</b> - If set to "true" data will not be stored on server. Used for development and testing.</li>
-		<li><b>WUup....</b> - Attribute name corresponding to <a href="http://support.wetter.com/attachments/token/titkme05m63xv8e/?name=2013-06-01+-+WeatherReport-API.de.pdf">parameter name from api.</a> 
+		<li><b>WUup....</b> - Attribute name corresponding to <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">parameter name from api.</a> 
 			Each of this attributes contains information about weather data to be sent in format 
 			<code>sensorName:readingName[:offset]</code><br/>
-			Example: <code>attr WUup WUupte outside:temperature</code> will define the attribut WUupte and <br/>
-			reading "temperature" from device "outside" will be sent to network as paramater "te" (which indicates current temperature)<br/>
+			Example: <code>attr WUup wutempf outside:temperature</code> will define the attribut wutempf and <br/>
+			reading "temperature" from device "outside" will be sent to network as parameter "tempf" (which indicates current temperature)<br/>
+			Units get converted to angloamerican system automatically (e.g. mph -> km/h)<br/>
 			Optional Parameter "offset" will be added to the read value 
 			(e.g. sometimes necessary to send dewpoint - use offset 273.15 if needed in Kelvin)
 			</li>
@@ -202,14 +214,14 @@ sub WUup_send($) {
 	<b>Generated Readings/Events:</b>
 	<br/><br/>
 	<ul>
-		<li><b>data</b> - data string transmitted to www.wetter.com</li>
+		<li><b>data</b> - data string transmitted to www.wunderground.com</li>
 		<li><b>response</b> - response string received from server</li>
 	</ul>
 	<br/><br/>
 
 	<b>Author's notes</b><br/><br/>
 	<ul>
-		<li>Find complete api description <a href="http://support.wetter.com/attachments/token/titkme05m63xv8e/?name=2013-06-01+-+WeatherReport-API.de.pdf">here</a></li>
+		<li>Find complete api description <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">here</a></li>
 		<li>Have fun!</li><br/>
 	</ul>
 
