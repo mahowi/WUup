@@ -1,3 +1,4 @@
 59_WUup.pm last change:
 2017-01-23
- - prepare for automatic updates
+ - tidy up code;
+fix for 'each on reference is experimental';

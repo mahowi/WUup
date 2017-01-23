@@ -1,4 +1,4 @@
-# $Id: 59_WUup.pm 2 2017-01-23 13:17:58Z mahowi $
+# $Id: 59_WUup.pm 3 2017-01-23 13:17:58Z mahowi $
 ####################################################################################################
 #
 #    59_WUup.pm
@@ -139,11 +139,11 @@ sub WUup_send($) {
         CommandDeleteReading( undef, "$name response" );
         Log3( $name, 4, "WUup $name no data" );
         readingsBulkUpdate( $hash, "state", "defined" );
-        $attr{$name}{WUupInterval} = 60;
+        $attr{$name}{wuInterval} = 60;
     }
     readingsEndUpdate( $hash, 1 );
 
-    InternalTimer( gettimeofday() + $attr{$name}{WUupInterval},
+    InternalTimer( gettimeofday() + $attr{$name}{wuInterval},
         "WUup_send", $hash, 0 )
       unless ( $local == 1 );
 
