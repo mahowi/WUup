@@ -1,4 +1,4 @@
-# $Id: 59_WUup.pm 6 2017-01-23 20:22:35Z mahowi $
+# $Id: 59_WUup.pm 7 2017-02-10 24:15:35Z mahowi $
 ################################################################################
 #    59_WUup.pm
 #
@@ -163,11 +163,14 @@ sub WUup_send($) {
 # Changelog:
 #
 # 2017-01-23 initial release
+# 2017-02-10 added german docu
 #
 ################################################################################
 
 =pod
 =item helper
+=item summary sends weather data to Weather Underground
+=item summary_DE sendet Wetterdaten zu Weather Underground
 =begin html
 
 <a name="WUup"></a>
@@ -217,20 +220,18 @@ sub WUup_send($) {
             Each of these attributes contains information about weather data to be sent 
             in format <code>sensorName:readingName[:offset]</code><br/>
             Example: <code>attr WUup wutempf outside:temperature</code> will 
-            define the attribut wutempf and <br/>
+            define the attribute wutempf and <br/>
             reading "temperature" from device "outside" will be sent to 
             network as parameter "tempf" (which indicates current temperature)
             <br/>
             Units get converted to angloamerican system automatically 
             (&deg;C -> &deg;F; km/h -> mph; mm -> in; hPa -> inHg)<br/>
-            Optional Parameter "offset" will be added to the read value 
-            (e.g. sometimes necessary to send dewpoint - use offset 273.15 if 
-            needed in Kelvin)
+            Optional Parameter "offset" will be added to the read value.
         </li>
     </ul>
     <br/><br/>
 
-    <b>Generated Readings/Events:</b>
+    <b>Readings/Events:</b>
     <br/><br/>
     <ul>
         <li><b>data</b> - data string transmitted to www.wunderground.com</li>
@@ -238,7 +239,7 @@ sub WUup_send($) {
     </ul>
     <br/><br/>
 
-    <b>Author's notes</b><br/><br/>
+    <b>Notes</b><br/><br/>
     <ul>
         <li>Find complete api description 
 <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">here</a></li>
@@ -253,8 +254,74 @@ sub WUup_send($) {
 <a name="WUup"></a>
 <h3>WUup</h3>
 <ul>
-Sorry, keine deutsche Dokumentation vorhanden.<br/><br/>
-Die englische Doku gibt es hier: <a href='commandref.html#WUup'>WUup</a><br/>
+
+    <a name="WUupdefine"></a>
+    <b>Define</b>
+    <ul>
+
+        <br/>
+        <code>define &lt;name&gt; WUup &lt;stationId&gt; &lt;password&gt;</code>
+        <br/><br/>
+        Dieses Modul stellt eine Verbindung zu <a href="https://www.wunderground.com">www.wunderground.com</a></br>
+        her, um Daten einer eigenen Wetterstation zu versenden..<br/>
+
+    </ul>
+    <br/><br/>
+
+    <a name="WUupset"></a>
+    <b>Set-Befehle</b><br/>
+    <ul>
+        <br/>
+        - keine -<br/>
+    </ul>
+    <br/><br/>
+
+    <a name="WUupget"></a>
+    <b>Get-Befehle</b><br/>
+    <ul>
+        <br/>
+        - keine -<br/>
+    </ul>
+    <br/><br/>
+
+    <a name="WUupattr"></a>
+    <b>Attribute</b><br/><br/>
+    <ul>
+        <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+        <br/>
+        <li><b>wuInterval</b> - Sendeintervall in Sekunden. Wird auf 60
+        eingestellt, wenn der Wert kleiner als 60 ist.</li>
+        <li><b>wu....</b> - Attributname entsprechend dem 
+<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">Parameternamen aus der API.</a><br />
+        Jedes dieser Attribute enth&auml;lt Informationen &uuml;ber zu sendende Wetterdaten
+        im Format <code>sensorName:readingName[:offset]</code>.<br/>
+        Beispiel: <code>attr WUup wutempf outside:temperature</code> definiert
+        das Attribut wutempf und sendet das Reading "temperature" vom Ger&auml;t "outside" als Parameter "tempf" 
+        (welches die aktuelle Temperatur angibt).
+        <br />
+        Einheiten werden automatisch ins anglo-amerikanische System umgerechnet. 
+        (&deg;C -> &deg;F; km/h -> mph; mm -> in; hPa -> inHg)<br/>
+        Der optionale Parameter "offset" wird zum ausgelesenen Wert addiert.
+        </li>
+    </ul>
+    <br/><br/>
+
+    <b>Readings/Events:</b>
+    <br/><br/>
+    <ul>
+        <li><b>data</b> - Daten, die zu www.wunderground.com gesendet werden</li>
+        <li><b>response</b> - Antwort, die vom Server empfangen wird</li>
+    </ul>
+    <br/><br/>
+
+    <b>Notizen</b><br/><br/>
+    <ul>
+        <li>Die komplette API-Beschreibung findet sich 
+<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">hier</a></li>
+        <li>Viel Spa&szlig;!</li><br/>
+    </ul>
+
 </ul>
+
 =end html_DE
 =cut
