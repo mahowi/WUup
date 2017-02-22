@@ -1,4 +1,4 @@
-# $Id: 59_WUup.pm 7 2017-02-10 24:15:35Z mahowi $
+# $Id: 59_WUup.pm 8 2017-02-22 17:45:35Z mahowi $
 ################################################################################
 #    59_WUup.pm
 #
@@ -28,10 +28,20 @@ package main;
 
 use strict;
 use warnings;
-use experimental 'smartmatch';
+#use experimental 'smartmatch';
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
+
+my $version = "0.8";
+
+# Declare functions
+sub WUup_Initialize($);
+sub WUup_Define($$$);
+sub WUup_Undef($$);
+sub WUup_Attr(@);
+sub WUup_stateRequestTimer($);
+sub WUup_send($);
 
 ################################################################################
 #
@@ -44,14 +54,17 @@ sub WUup_Initialize($) {
 
     $hash->{DefFn}   = "WUup_Define";
     $hash->{UndefFn} = "WUup_Undef";
+    $hash->{AttrFn}  = "WUup_Attr";
     $hash->{AttrList} =
-        "disable:1,0 "
-      . "wuInterval:60,180,300,600,1800,3600 "
+        "disable:1 "
+      . "disabledForIntervals "
+      . "interval "
       . "wuwinddir wuwindspeedmph wuwindgustmph wuwindgustdir wuwinddir_avg2m  "
       . "wuwinddir_avg2m wuwindgustmph_10m wuwindgustdir_10m wuhumidity "
       . "wusoilmoisture wudewptf wutempf wurainin wudailyrainin wubaromin "
       . "wusoiltempf wusolarradiation wuUV "
       . $readingFnAttributes;
+    $hash->{VERSION} = $version;
 }
 
 sub WUup_Define($$$) {
@@ -60,7 +73,11 @@ sub WUup_Define($$$) {
 
     return "syntax: define <name> WUup <stationID> <password>"
       if ( int(@a) != 4 );
+
     my $name = $hash->{NAME};
+
+    $hash->{VERSION}  = $version;
+    $hash->{INTERVAL} = 300;
 
     $hash->{helper}{stationid}    = $a[2];
     $hash->{helper}{password}     = $a[3];
@@ -68,9 +85,20 @@ sub WUup_Define($$$) {
     $hash->{helper}{url} =
 "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
 
-    Log3( $name, 4, "WUup $name: created" );
     readingsSingleUpdate( $hash, "state", "defined", 1 );
-    WUup_send($hash);
+
+    $attr{$name}{room} = "Weather" if ( !defined( $attr{$name}{room} ) );
+
+    RemoveInternalTimer($hash);
+
+    if ($init_done) {
+        WUup_stateRequestTimer($hash);
+    }
+    else {
+        InternalTimer( gettimeofday(), "WUup_stateRequestTimer", $hash, 0 );
+    }
+
+    Log3 $name, 3, "WUup ($name): defined";
 
     return undef;
 }
@@ -81,10 +109,88 @@ sub WUup_Undef($$) {
     return undef;
 }
 
+sub WUup_Attr(@) {
+    my ( $cmd, $name, $attrName, $attrVal ) = @_;
+    my $hash = $defs{$name};
+
+    if ( $attrName eq "disable" ) {
+        if ( $cmd eq "set" and $attrVal eq "1" ) {
+            readingsSingleUpdate( $hash, "state", "disabled", 1 );
+            Log3 $name, 3, "WUup ($name) - disabled";
+        }
+
+        elsif ( $cmd eq "del" ) {
+            readingsSingleUpdate( $hash, "state", "active", 1 );
+            Log3 $name, 3, "WUup ($name) - enabled";
+        }
+    }
+
+    if ( $attrName eq "disabledForIntervals" ) {
+        if ( $cmd eq "set" ) {
+            readingsSingleUpdate( $hash, "state", "unknown", 1 );
+            Log3 $name, 3, "WUup ($name) - disabledForIntervals";
+        }
+
+        elsif ( $cmd eq "del" ) {
+            readingsSingleUpdate( $hash, "state", "active", 1 );
+            Log3 $name, 3, "WUup ($name) - enabled";
+        }
+    }
+
+    if ( $attrName eq "interval" ) {
+        if ( $cmd eq "set" ) {
+            if ( $attrVal < 60 ) {
+                Log3 $name, 3,
+"WUup ($name) - interval too small, please use something >= 60 (sec), default is 300 (sec).";
+                return
+"interval too small, please use something >= 60 (sec), default is 300 (sec)";
+            }
+            else {
+                $hash->{INTERVAL} = $attrVal;
+                Log3 $name, 3, "WUup ($name) - set interval to $attrVal";
+            }
+        }
+
+        elsif ( $cmd eq "del" ) {
+            $hash->{INTERVAL} = 300;
+            Log3 $name, 3, "WUup ($name) - set interval to default";
+        }
+    }
+
+    return undef;
+}
+
+sub WUup_stateRequestTimer($) {
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    if ( !IsDisabled($name) ) {
+        readingsSingleUpdate( $hash, "state", "active", 1 )
+          if (
+            (
+                   ReadingsVal( $name, "state", 0 ) eq "defined"
+                or ReadingsVal( $name, "state", 0 ) eq "disabled"
+                or ReadingsVal( $name, "state", 0 ) eq "Unknown"
+            )
+          );
+
+        WUup_send($hash);
+
+    }
+    else {
+        readingsSingleUpdate( $hash, "state", "disabled", 1 );
+    }
+
+    InternalTimer( gettimeofday() + $hash->{INTERVAL},
+        "WUup_stateRequestTimer", $hash, 1 );
+
+    Log3 $name, 5,
+      "Sub WUup_stateRequestTimer ($name) - Request Timer is called";
+}
+
 sub WUup_send($) {
     my ( $hash, $local ) = @_;
     my $name = $hash->{NAME};
-    return if IsDisabled($name);
 
     $local = 0 unless ( defined($local) );
     my $url = $hash->{helper}{url};
@@ -94,14 +200,10 @@ sub WUup_send($) {
     $datestring =~ s/:/%3A/g;
     $url .= "&dateutc=" . $datestring;
 
-    $attr{$name}{wuInterval} = 60 if ( AttrVal( $name, "wuInterval", 0 ) < 60 );
-    RemoveInternalTimer($hash);
-
     my ( $data, $d, $r, $o );
     my $a = $attr{$name};
     while ( my ( $key, $value ) = each(%$a) ) {
         next if substr( $key, 0, 2 ) ne 'wu';
-        next if substr( $key, 2, 1 ) ~~ ["I"];
         $key = substr( $key, 2, length($key) - 2 );
         ( $d, $r, $o ) = split( ":", $value );
         if ( defined($r) ) {
@@ -126,28 +228,24 @@ sub WUup_send($) {
     readingsBeginUpdate($hash);
     if ( defined($data) ) {
         readingsBulkUpdate( $hash, "data", $data );
-        Log3( $name, 4, "WUup $name data sent: $data" );
+        Log3 $name, 3, "WUup ($name) - data sent: $data";
         $url .= $data;
         $url .= "&softwaretype=" . $hash->{helper}{softwaretype};
         $url .= "&action=updateraw";
-        Log3( $name, 4, "WUup $name full URL: $url" );
+        Log3 $name, 4, "WUup ($name) - full URL: $url";
         my $response = GetFileFromURL($url);
         readingsBulkUpdate( $hash, "response", $response );
-        Log3( $name, 4, "WUup $name server response: $response" );
-        readingsBulkUpdate( $hash, "state", "active" );
+        Log3 $name, 3, "WUup ($name) - server response: $response";
+
     }
     else {
         CommandDeleteReading( undef, "$name data" );
         CommandDeleteReading( undef, "$name response" );
-        Log3( $name, 4, "WUup $name no data" );
+        Log3 $name, 3, "WUup ($name) - no data";
         readingsBulkUpdate( $hash, "state", "defined" );
-        $attr{$name}{wuInterval} = 60;
+
     }
     readingsEndUpdate( $hash, 1 );
-
-    InternalTimer( gettimeofday() + $attr{$name}{wuInterval},
-        "WUup_send", $hash, 0 )
-      unless ( $local == 1 );
 
     return;
 }
@@ -164,6 +262,10 @@ sub WUup_send($) {
 #
 # 2017-01-23 initial release
 # 2017-02-10 added german docu
+# 2017-02-22 fixed bug when module can get reenabled after disabling
+#            added disableForTimer
+#            changed attribute WUInterval to interval
+#            default interval 300
 #
 ################################################################################
 
@@ -212,9 +314,11 @@ sub WUup_send($) {
     <ul>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         <br/>
-        <li><b>wuInterval</b> - Interval (seconds) to send data to 
+        <li><b>interval</b> - Interval (seconds) to send data to 
             www.wunderground.com. 
-            Will be adjusted to 60 if set to a value lower than 60.</li>
+            Will be adjusted to 300 (which is the default) if set to a value lower than 60.</li>
+        <li><b>disable</b> - disables the module</li>
+        <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
         <li><b>wu....</b> - Attribute name corresponding to 
 <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">parameter name from api.</a> 
             Each of these attributes contains information about weather data to be sent 
@@ -289,8 +393,10 @@ sub WUup_send($) {
     <ul>
         <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
         <br/>
-        <li><b>wuInterval</b> - Sendeintervall in Sekunden. Wird auf 60
+        <li><b>interval</b> - Sendeinterval in Sekunden. Wird auf 300 (Default-Wert)
         eingestellt, wenn der Wert kleiner als 60 ist.</li>
+        <li><b>disable</b> - deaktiviert das Modul</li>
+        <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
         <li><b>wu....</b> - Attributname entsprechend dem 
 <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">Parameternamen aus der API.</a><br />
         Jedes dieser Attribute enth&auml;lt Informationen &uuml;ber zu sendende Wetterdaten
