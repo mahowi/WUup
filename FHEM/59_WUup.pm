@@ -443,7 +443,7 @@ sub WUup_send($) {
         <br />
         Einheiten werden automatisch ins anglo-amerikanische System umgerechnet. 
         (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
-        <u>Unterst&uml;tzte Angaben</u>
+        <u>Unterst&uuml;tzte Angaben</u>
         <ul>
             <li>Winddir - [0-360 momentane Windrichtung]</li>
             <li>Windspeedmph - [mph momentane Windgeschwindigkeit]</li>
