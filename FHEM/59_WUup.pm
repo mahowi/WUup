@@ -216,19 +216,25 @@ sub WUup_send($) {
             $value = ReadingsVal( $d, $r, 0 ) + $o;
         }
         if ( $key =~ /\w+f$/ ) {
-            $value = UConv::c2f($value);
+            $value = UConv::c2f( $value, 4 );
         }
         elsif ( $key =~ /\w+mph.*/ ) {
-            if ( $attr{name}{unit_windspeed} eq "m/s" ) {
-                $value = UConv::mps2kph($value);
+
+         # Debug("WUup ($name) - unit_windspeed: $attr{$name}{unit_windspeed}");
+            if ( $attr{$name}{unit_windspeed} eq "m/s" ) {
+                Log3 $name, 5, "WUup ($name) - windspeed unit is m/s";
+                $value = UConv::kph2mph( ( UConv::mps2kph( $value, 4 ) ), 4 );
             }
-            $value = UConv::kph2mph($value);
+            else {
+                Log3 $name, 5, "WUup ($name) - windspeed unit is km/h";
+                $value = UConv::kph2mph( $value, 4 );
+            }
         }
         elsif ( $key eq "baromin" ) {
-            $value = UConv::hpa2inhg($value);
+            $value = UConv::hpa2inhg( $value, 4 );
         }
         elsif ( $key =~ /.*rainin$/ ) {
-            $value = UConv::mm2in($value);
+            $value = UConv::mm2in( $value, 4 );
         }
         $data .= "&$key=$value";
     }
