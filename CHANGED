@@ -1,6 +1,3 @@
 59_WUup.pm last change:
-2017-02-22
- - - fixed a bug with disable
-- added disabledForIntervals
-- attribute WUInterval renamed to interval
-- default interval 300 seconds
+2017-02-23
+ - new attribute unit_windspeed
