@@ -142,20 +142,20 @@ sub WUup_Attr(@) {
     if ( $attrName eq "interval" ) {
         if ( $cmd eq "set" ) {
             if ( $attrVal < 60 ) {
-                Log3 $name, 3,
+                Log3 $name, 1,
 "WUup ($name) - interval too small, please use something >= 60 (sec), default is 300 (sec).";
                 return
 "interval too small, please use something >= 60 (sec), default is 300 (sec)";
             }
             else {
                 $hash->{INTERVAL} = $attrVal;
-                Log3 $name, 3, "WUup ($name) - set interval to $attrVal";
+                Log3 $name, 4, "WUup ($name) - set interval to $attrVal";
             }
         }
 
         elsif ( $cmd eq "del" ) {
             $hash->{INTERVAL} = 300;
-            Log3 $name, 3, "WUup ($name) - set interval to default";
+            Log3 $name, 4, "WUup ($name) - set interval to default";
         }
     }
 
@@ -191,10 +191,9 @@ sub WUup_stateRequestTimer($) {
 }
 
 sub WUup_send($) {
-    my ( $hash, $local ) = @_;
+    my ($hash) = @_;
     my $name = $hash->{NAME};
 
-    $local = 0 unless ( defined($local) );
     my $url = $hash->{helper}{url};
     $url .= "?ID=" . $hash->{helper}{stationid};
     $url .= "&PASSWORD=" . $hash->{helper}{password};
@@ -242,14 +241,14 @@ sub WUup_send($) {
     readingsBeginUpdate($hash);
     if ( defined($data) ) {
         readingsBulkUpdate( $hash, "data", $data );
-        Log3 $name, 3, "WUup ($name) - data sent: $data";
+        Log3 $name, 4, "WUup ($name) - data sent: $data";
         $url .= $data;
         $url .= "&softwaretype=" . $hash->{helper}{softwaretype};
         $url .= "&action=updateraw";
-        Log3 $name, 4, "WUup ($name) - full URL: $url";
+        Log3 $name, 5, "WUup ($name) - full URL: $url";
         my $response = GetFileFromURL($url);
         readingsBulkUpdate( $hash, "response", $response );
-        Log3 $name, 3, "WUup ($name) - server response: $response";
+        Log3 $name, 4, "WUup ($name) - server response: $response";
 
     }
     else {
@@ -276,10 +275,12 @@ sub WUup_send($) {
 #
 # 2017-01-23 initial release
 # 2017-02-10 added german docu
-# 2017-02-22 fixed bug when module can get reenabled after disabling
-#            added disableForTimer
+# 2017-02-22 fixed bug when module cannot get reenabled after disabling
+#            added disabledForIntervals
 #            changed attribute WUInterval to interval
 #            default interval 300
+# 2017-02-23 added attribute unit_windspeed
+#            coverted units rounded to 4 decimal places
 #
 ################################################################################
 
@@ -326,25 +327,24 @@ sub WUup_send($) {
     <a name="WUupattr"></a>
     <b>Attributes</b><br/><br/>
     <ul>
-        <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-        <br/>
+        <li><b><a href="#readingFnAttributes">readingFnAttributes</a></b></li>
         <li><b>interval</b> - Interval (seconds) to send data to 
             www.wunderground.com. 
             Will be adjusted to 300 (which is the default) if set to a value lower than 60.</li>
         <li><b>disable</b> - disables the module</li>
-        <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+        <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
+        <li><b>unit_windspeed</b> - change the units of your windspeed readings (m/s or km/h)</li>
         <li><b>wu....</b> - Attribute name corresponding to 
 <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">parameter name from api.</a> 
             Each of these attributes contains information about weather data to be sent 
-            in format <code>sensorName:readingName[:offset]</code><br/>
+            in format <code>sensorName:readingName</code><br/>
             Example: <code>attr WUup wutempf outside:temperature</code> will 
             define the attribute wutempf and <br/>
             reading "temperature" from device "outside" will be sent to 
             network as parameter "tempf" (which indicates current temperature)
             <br/>
             Units get converted to angloamerican system automatically 
-            (&deg;C -> &deg;F; km/h -> mph; mm -> in; hPa -> inHg)<br/>
-            Optional Parameter "offset" will be added to the read value.
+            (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)
         </li>
     </ul>
     <br/><br/>
@@ -405,23 +405,23 @@ sub WUup_send($) {
     <a name="WUupattr"></a>
     <b>Attribute</b><br/><br/>
     <ul>
-        <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
-        <br/>
+        <li><b><a href="#readingFnAttributes">readingFnAttributes</a></b></li>
         <li><b>interval</b> - Sendeinterval in Sekunden. Wird auf 300 (Default-Wert)
         eingestellt, wenn der Wert kleiner als 60 ist.</li>
         <li><b>disable</b> - deaktiviert das Modul</li>
-        <li><a href="#disabledForIntervals">disabledForIntervals</a></li>
+        <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
+        <li><b>unit_windspeed</b> - gibt die Einheit der Readings für die
+        Windgeschwindigkeiten an (m/s oder km/h)</li>
         <li><b>wu....</b> - Attributname entsprechend dem 
 <a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">Parameternamen aus der API.</a><br />
         Jedes dieser Attribute enth&auml;lt Informationen &uuml;ber zu sendende Wetterdaten
-        im Format <code>sensorName:readingName[:offset]</code>.<br/>
+        im Format <code>sensorName:readingName</code>.<br/>
         Beispiel: <code>attr WUup wutempf outside:temperature</code> definiert
         das Attribut wutempf und sendet das Reading "temperature" vom Ger&auml;t "outside" als Parameter "tempf" 
         (welches die aktuelle Temperatur angibt).
         <br />
         Einheiten werden automatisch ins anglo-amerikanische System umgerechnet. 
-        (&deg;C -> &deg;F; km/h -> mph; mm -> in; hPa -> inHg)<br/>
-        Der optionale Parameter "offset" wird zum ausgelesenen Wert addiert.
+        (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)
         </li>
     </ul>
     <br/><br/>
