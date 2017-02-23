@@ -1,3 +1,3 @@
 59_WUup.pm last change:
 2017-02-23
- - new attribute unit_windspeed
+ - converted units rounded to 4 decimal places; fixed conversion from m/s to mph
