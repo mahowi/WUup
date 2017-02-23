@@ -1,4 +1,4 @@
-# $Id: 59_WUup.pm 8 2017-02-22 17:45:35Z mahowi $
+# $Id: 59_WUup.pm 9 2017-02-23 12:30:35Z mahowi $
 ################################################################################
 #    59_WUup.pm
 #
@@ -28,12 +28,11 @@ package main;
 
 use strict;
 use warnings;
-#use experimental 'smartmatch';
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.8";
+my $version = "0.9";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -59,6 +58,7 @@ sub WUup_Initialize($) {
         "disable:1 "
       . "disabledForIntervals "
       . "interval "
+      . "unit_windspeed:km/h,m/s "
       . "wuwinddir wuwindspeedmph wuwindgustmph wuwindgustdir wuwinddir_avg2m  "
       . "wuwinddir_avg2m wuwindgustmph_10m wuwindgustdir_10m wuhumidity "
       . "wusoilmoisture wudewptf wutempf wurainin wudailyrainin wubaromin "
@@ -88,6 +88,8 @@ sub WUup_Define($$$) {
     readingsSingleUpdate( $hash, "state", "defined", 1 );
 
     $attr{$name}{room} = "Weather" if ( !defined( $attr{$name}{room} ) );
+    $attr{$name}{unit_windspeed} = "km/h"
+      if ( !defined( $attr{$name}{unit_windspeed} ) );
 
     RemoveInternalTimer($hash);
 
@@ -200,6 +202,9 @@ sub WUup_send($) {
     $datestring =~ s/:/%3A/g;
     $url .= "&dateutc=" . $datestring;
 
+    $attr{$name}{unit_windspeed} = "km/h"
+      if ( !defined( $attr{$name}{unit_windspeed} ) );
+
     my ( $data, $d, $r, $o );
     my $a = $attr{$name};
     while ( my ( $key, $value ) = each(%$a) ) {
@@ -214,6 +219,9 @@ sub WUup_send($) {
             $value = UConv::c2f($value);
         }
         elsif ( $key =~ /\w+mph.*/ ) {
+            if ( $attr{name}{unit_windspeed} eq "m/s" ) {
+                $value = UConv::mps2kph($value);
+            }
             $value = UConv::kph2mph($value);
         }
         elsif ( $key eq "baromin" ) {
