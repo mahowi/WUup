@@ -280,7 +280,7 @@ sub WUup_send($) {
 #            changed attribute WUInterval to interval
 #            default interval 300
 # 2017-02-23 added attribute unit_windspeed
-#            coverted units rounded to 4 decimal places
+#            converted units rounded to 4 decimal places
 #
 ################################################################################
 
@@ -344,7 +344,28 @@ sub WUup_send($) {
             network as parameter "tempf" (which indicates current temperature)
             <br/>
             Units get converted to angloamerican system automatically 
-            (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)
+            (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
+        <u>The following information is supported:</u>
+        <ul>
+            <li>winddir - [0-360 instantaneous wind direction]</li>
+            <li>windspeedmph - [mph instantaneous wind speed]</li>
+            <li>windgustmph - [mph current wind gust, using software specific time period]</li>
+            <li>windgustdir - [0-360 using software specific time period]</li>
+            <li>windspdmph_avg2m  - [mph 2 minute average wind speed mph]</li>
+            <li>winddir_avg2m - [0-360 2 minute average wind direction]</li>
+            <li>windgustmph_10m - [mph past 10 minutes wind gust mph]</li>
+            <li>windgustdir_10m - [0-360 past 10 minutes wind gust direction]</li>
+            <li>humidity - [&#37; outdoor humidity 0-100&#37;]</li>
+            <li>dewptf- [F outdoor dewpoint F]</li>
+            <li>tempf - [F outdoor temperature]</li>
+            <li>rainin - [rain inches over the past hour)] -- the accumulated rainfall in the past 60 min</li>
+            <li>dailyrainin - [rain inches so far today in local time]</li>
+            <li>baromin - [barometric pressure inches]</li>
+            <li>soiltempf - [F soil temperature]</li>
+            <li>soilmoisture - [&#37;]</li>
+            <li>solarradiation - [W/m&sup2;]</li>
+            <li>UV - [index]</li>
+        </ul>
         </li>
     </ul>
     <br/><br/>
@@ -421,7 +442,28 @@ sub WUup_send($) {
         (welches die aktuelle Temperatur angibt).
         <br />
         Einheiten werden automatisch ins anglo-amerikanische System umgerechnet. 
-        (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)
+        (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
+        <u>Unterst&uml;tzte Angaben</u>
+        <ul>
+            <li>Winddir - [0-360 momentane Windrichtung]</li>
+            <li>Windspeedmph - [mph momentane Windgeschwindigkeit]</li>
+            <li>Windgustmph - [mph aktuellen B&ouml;e, mit Software-spezifischem Zeitraum]</li>
+            <li>Windgustdir - [0-360 mit Software-spezifischer Zeit]</li>
+            <li>Windspdmph_avg2m - [mph durchschnittliche Windgeschwindigkeit innerhalb 2 Minuten]</li>
+            <li>Winddir_avg2m - [0-360 durchschnittliche Windrichtung innerhalb 2 Minuten]</li>
+            <li>Windgustmph_10m - [mph B&ouml;en der vergangenen 10 Minuten]</li>
+            <li>Windgustdir_10m - [0-360 Richtung der B&ouml;en der letzten 10 Minuten]</li>
+            <li>Feuchtigkeit - [&#37; Au&szlig;enfeuchtigkeit 0-100&#37;]</li>
+            <li>Dewptf- [F Taupunkt im Freien]</li>
+            <li>Tempf - [F Au&szlig;entemperatur]</li>
+            <li>Rainin - [in Regen in der vergangenen Stunde]</li>
+            <li>Dailyrainin - [in Regenmenge bisher heute]</li>
+            <li>Baromin - [inHg barometrischer Druck]</li>
+            <li>Soiltempf - [F Bodentemperatur]</li>
+            <li>Bodenfeuchtigkeit - [&#37;]</li>
+            <li>Solarradiation - [W/m&sup2;]</li>
+            <li>UV - [Index]</li>
+        </ul>
         </li>
     </ul>
     <br/><br/>
