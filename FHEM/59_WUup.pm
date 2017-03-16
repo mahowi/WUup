@@ -1,4 +1,4 @@
-# $Id: 59_WUup.pm 9 2017-02-23 12:30:35Z mahowi $
+# $Id: 59_WUup.pm 10 2017-02-23 12:30:35Z mahowi $
 ################################################################################
 #    59_WUup.pm
 #
@@ -32,7 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9";
+my $version = "0.9.1";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -41,6 +41,7 @@ sub WUup_Undef($$);
 sub WUup_Attr(@);
 sub WUup_stateRequestTimer($);
 sub WUup_send($);
+sub WUup_receive($);
 
 ################################################################################
 #
@@ -81,7 +82,7 @@ sub WUup_Define($$$) {
 
     $hash->{helper}{stationid}    = $a[2];
     $hash->{helper}{password}     = $a[3];
-    $hash->{helper}{softwaretype} = 'fhem';
+    $hash->{helper}{softwaretype} = 'FHEM';
     $hash->{helper}{url} =
 "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
 
@@ -191,8 +192,9 @@ sub WUup_stateRequestTimer($) {
 }
 
 sub WUup_send($) {
-    my ($hash) = @_;
-    my $name = $hash->{NAME};
+    my ($hash)  = @_;
+    my $name    = $hash->{NAME};
+    my $version = $hash->{VERSION};
 
     my $url = $hash->{helper}{url};
     $url .= "?ID=" . $hash->{helper}{stationid};
@@ -245,11 +247,23 @@ sub WUup_send($) {
         $url .= $data;
         $url .= "&softwaretype=" . $hash->{helper}{softwaretype};
         $url .= "&action=updateraw";
-        Log3 $name, 5, "WUup ($name) - full URL: $url";
-        my $response = GetFileFromURL($url);
-        readingsBulkUpdate( $hash, "response", $response );
-        Log3 $name, 4, "WUup ($name) - server response: $response";
 
+        my $param = {
+            url     => $url,
+            timeout => 4,
+            hash    => $hash,
+            method  => "GET",
+            header =>
+              "agent: FHEM-WUup/$version\r\nUser-Agent: FHEM-WUup/$version",
+            callback => \&WUup_receive
+        };
+
+        Log3 $name, 5, "WUup ($name) - full URL: $url";
+        HttpUtils_NonblockingGet($param);
+
+        #        my $response = GetFileFromURL($url);
+        #        readingsBulkUpdate( $hash, "response", $response );
+        #        Log3 $name, 4, "WUup ($name) - server response: $response";
     }
     else {
         CommandDeleteReading( undef, "$name data" );
@@ -261,6 +275,23 @@ sub WUup_send($) {
     readingsEndUpdate( $hash, 1 );
 
     return;
+}
+
+sub WUup_receive($) {
+    my ( $param, $err, $data ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+
+    if ( $err ne "" ) {
+        Log3 $name, 3,
+          "WUup ($name) - error while requesting " . $param->{url} . " - $err";
+        readingsSingleUpdate( $hash, "state",    "ERROR", undef );
+        readingsSingleUpdate( $hash, "response", $err,    undef );
+    }
+    elsif ( $data ne "" ) {
+        Log3 $name, 4, "WUup ($name) - server response: $data";
+        readingsSingleUpdate( $hash, "response", $data, undef );
+    }
 }
 
 1;
