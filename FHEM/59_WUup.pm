@@ -83,8 +83,8 @@ sub WUup_Define($$$) {
     $hash->{helper}{stationid}    = $a[2];
     $hash->{helper}{password}     = $a[3];
     $hash->{helper}{softwaretype} = 'FHEM';
-    $hash->{helper}{url} =
-"https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
+    $hash->{helper}{url} = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
+    $hash->{helper}{url_rf} = "https://rtupdate.wunderground.com/weatherstation/updateweatherstation.php";
 
     readingsSingleUpdate( $hash, "state", "defined", 1 );
 
@@ -142,11 +142,11 @@ sub WUup_Attr(@) {
 
     if ( $attrName eq "interval" ) {
         if ( $cmd eq "set" ) {
-            if ( $attrVal < 60 ) {
+            if ( $attrVal < 3 ) {
                 Log3 $name, 1,
-"WUup ($name) - interval too small, please use something >= 60 (sec), default is 300 (sec).";
+"WUup ($name) - interval too small, please use something >= 3 (sec), default is 300 (sec).";
                 return
-"interval too small, please use something >= 60 (sec), default is 300 (sec)";
+"interval too small, please use something >= 3 (sec), default is 300 (sec)";
             }
             else {
                 $hash->{INTERVAL} = $attrVal;
@@ -195,8 +195,13 @@ sub WUup_send($) {
     my ($hash)  = @_;
     my $name    = $hash->{NAME};
     my $version = $hash->{VERSION};
-
-    my $url = $hash->{helper}{url};
+    my $url = "";
+    if ($hash->{INTERVAL} < 300) {
+       $url = $hash->{helper}{url};
+    }
+    else {
+       $url = $hash->{helper}{url_rf};
+    };
     $url .= "?ID=" . $hash->{helper}{stationid};
     $url .= "&PASSWORD=" . $hash->{helper}{password};
     my $datestring = strftime "%F+%T", gmtime;
@@ -247,7 +252,9 @@ sub WUup_send($) {
         $url .= $data;
         $url .= "&softwaretype=" . $hash->{helper}{softwaretype};
         $url .= "&action=updateraw";
-
+        if ($hash->{INTERVAL} < 300) {
+           $url .= "&realtime=1&rtfreq=".$hash->{INTERVAL};
+        };
         my $param = {
             url     => $url,
             timeout => 4,
