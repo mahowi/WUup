@@ -197,10 +197,10 @@ sub WUup_send($) {
     my $version = $hash->{VERSION};
     my $url = "";
     if ($hash->{INTERVAL} < 300) {
-       $url = $hash->{helper}{url};
+       $url = $hash->{helper}{url_rf};
     }
     else {
-       $url = $hash->{helper}{url_rf};
+       $url = $hash->{helper}{url};
     };
     $url .= "?ID=" . $hash->{helper}{stationid};
     $url .= "&PASSWORD=" . $hash->{helper}{password};
