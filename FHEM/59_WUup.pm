@@ -1,4 +1,4 @@
-# $Id: 59_WUup.pm 10 2017-02-23 12:30:35Z mahowi $
+# $Id: 59_WUup.pm 11 2017-08-216 20:43:35Z mahowi $
 ################################################################################
 #    59_WUup.pm
 #
@@ -32,7 +32,7 @@ use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
 
-my $version = "0.9.1";
+my $version = "0.9.2";
 
 # Declare functions
 sub WUup_Initialize($);
@@ -83,8 +83,10 @@ sub WUup_Define($$$) {
     $hash->{helper}{stationid}    = $a[2];
     $hash->{helper}{password}     = $a[3];
     $hash->{helper}{softwaretype} = 'FHEM';
-    $hash->{helper}{url} = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
-    $hash->{helper}{url_rf} = "https://rtupdate.wunderground.com/weatherstation/updateweatherstation.php";
+    $hash->{helper}{url} =
+"https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php";
+    $hash->{helper}{url_rf} =
+"https://rtupdate.wunderground.com/weatherstation/updateweatherstation.php";
 
     readingsSingleUpdate( $hash, "state", "defined", 1 );
 
@@ -195,13 +197,13 @@ sub WUup_send($) {
     my ($hash)  = @_;
     my $name    = $hash->{NAME};
     my $version = $hash->{VERSION};
-    my $url = "";
-    if ($hash->{INTERVAL} < 300) {
-       $url = $hash->{helper}{url_rf};
+    my $url     = "";
+    if ( $hash->{INTERVAL} < 300 ) {
+        $url = $hash->{helper}{url_rf};
     }
     else {
-       $url = $hash->{helper}{url};
-    };
+        $url = $hash->{helper}{url};
+    }
     $url .= "?ID=" . $hash->{helper}{stationid};
     $url .= "&PASSWORD=" . $hash->{helper}{password};
     my $datestring = strftime "%F+%T", gmtime;
@@ -226,7 +228,6 @@ sub WUup_send($) {
         }
         elsif ( $key =~ /\w+mph.*/ ) {
 
-         # Debug("WUup ($name) - unit_windspeed: $attr{$name}{unit_windspeed}");
             if ( $attr{$name}{unit_windspeed} eq "m/s" ) {
                 Log3 $name, 5, "WUup ($name) - windspeed unit is m/s";
                 $value = UConv::kph2mph( ( UConv::mps2kph( $value, 4 ) ), 4 );
@@ -252,9 +253,9 @@ sub WUup_send($) {
         $url .= $data;
         $url .= "&softwaretype=" . $hash->{helper}{softwaretype};
         $url .= "&action=updateraw";
-        if ($hash->{INTERVAL} < 300) {
-           $url .= "&realtime=1&rtfreq=".$hash->{INTERVAL};
-        };
+        if ( $hash->{INTERVAL} < 300 ) {
+            $url .= "&realtime=1&rtfreq=" . $hash->{INTERVAL};
+        }
         my $param = {
             url     => $url,
             timeout => 4,
@@ -319,6 +320,8 @@ sub WUup_receive($) {
 #            default interval 300
 # 2017-02-23 added attribute unit_windspeed
 #            converted units rounded to 4 decimal places
+# 2017-03-16 implemented non-blocking mode
+# 2017-08-16 integrated RapidFire mode (thanks to Scooty66)
 #
 ################################################################################
 
@@ -368,7 +371,8 @@ sub WUup_receive($) {
         <li><b><a href="#readingFnAttributes">readingFnAttributes</a></b></li>
         <li><b>interval</b> - Interval (seconds) to send data to 
             www.wunderground.com. 
-            Will be adjusted to 300 (which is the default) if set to a value lower than 60.</li>
+            Will be adjusted to 300 (which is the default) if set to a value lower than 3.<br />
+            If lower than 300, RapidFire mode will be used.</li>
         <li><b>disable</b> - disables the module</li>
         <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
         <li><b>unit_windspeed</b> - change the units of your windspeed readings (m/s or km/h)</li>
@@ -466,7 +470,8 @@ sub WUup_receive($) {
     <ul>
         <li><b><a href="#readingFnAttributes">readingFnAttributes</a></b></li>
         <li><b>interval</b> - Sendeinterval in Sekunden. Wird auf 300 (Default-Wert)
-        eingestellt, wenn der Wert kleiner als 60 ist.</li>
+        eingestellt, wenn der Wert kleiner als 3 ist.<br />
+        Wenn der Wert kleiner als 300 ist, wird der RapidFire Modus verwendet.</li>
         <li><b>disable</b> - deaktiviert das Modul</li>
         <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
         <li><b>unit_windspeed</b> - gibt die Einheit der Readings für die
