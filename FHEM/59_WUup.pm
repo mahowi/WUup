@@ -1,4 +1,4 @@
-# $Id: 59_WUup.pm 11 2017-08-216 20:43:35Z mahowi $
+# $Id: 59_WUup.pm 19804 2019-07-09 08:28:57Z mahowi $
 ################################################################################
 #    59_WUup.pm
 #
@@ -31,13 +31,15 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use HttpUtils;
 use UConv;
+use FHEM::Meta;
 
-my $version = "0.9.2";
+my $version = "0.9.12";
 
 # Declare functions
 sub WUup_Initialize($);
 sub WUup_Define($$$);
 sub WUup_Undef($$);
+sub WUup_Set($@);
 sub WUup_Attr(@);
 sub WUup_stateRequestTimer($);
 sub WUup_send($);
@@ -54,22 +56,30 @@ sub WUup_Initialize($) {
 
     $hash->{DefFn}   = "WUup_Define";
     $hash->{UndefFn} = "WUup_Undef";
+    $hash->{SetFn}   = "WUup_Set";
     $hash->{AttrFn}  = "WUup_Attr";
     $hash->{AttrList} =
         "disable:1 "
       . "disabledForIntervals "
       . "interval "
       . "unit_windspeed:km/h,m/s "
-      . "wuwinddir wuwindspeedmph wuwindgustmph wuwindgustdir wuwinddir_avg2m  "
-      . "wuwinddir_avg2m wuwindgustmph_10m wuwindgustdir_10m wuhumidity "
-      . "wusoilmoisture wudewptf wutempf wurainin wudailyrainin wubaromin "
-      . "wusoiltempf wusolarradiation wuUV "
+      . "unit_solarradiation:W/m²,lux "
+      . "round "
+      . "wubaromin wudailyrainin wudewptf wuhumidity wurainin wusoilmoisture "
+      . "wusoiltempf wusolarradiation wutempf wuUV wuwinddir wuwinddir_avg2m "
+      . "wuwindgustdir wuwindgustdir_10m wuwindgustmph wuwindgustmph_10m "
+      . "wuwindspdmph_avg2m wuwindspeedmph wuAqPM2.5 wuAqPM10 "
       . $readingFnAttributes;
     $hash->{VERSION} = $version;
+
+    return FHEM::Meta::InitMod( __FILE__, $hash );
 }
 
 sub WUup_Define($$$) {
     my ( $hash, $def ) = @_;
+
+    return $@ unless ( FHEM::Meta::SetInternals($hash) );
+
     my @a = split( "[ \t][ \t]*", $def );
 
     return "syntax: define <name> WUup <stationID> <password>"
@@ -93,6 +103,9 @@ sub WUup_Define($$$) {
     $attr{$name}{room} = "Weather" if ( !defined( $attr{$name}{room} ) );
     $attr{$name}{unit_windspeed} = "km/h"
       if ( !defined( $attr{$name}{unit_windspeed} ) );
+    $attr{$name}{unit_solarradiation} = "lux"
+      if ( !defined( $attr{$name}{unit_solarradiation} ) );
+    $attr{$name}{round} = 4 if ( !defined( $attr{$name}{round} ) );
 
     RemoveInternalTimer($hash);
 
@@ -112,6 +125,19 @@ sub WUup_Undef($$) {
     my ( $hash, $arg ) = @_;
     RemoveInternalTimer($hash);
     return undef;
+}
+
+sub WUup_Set($@) {
+    my ( $hash, $name, $cmd, @args ) = @_;
+
+    return "\"set $name\" needs at least one argument" unless ( defined($cmd) );
+
+    if ( $cmd eq "update" ) {
+        WUup_stateRequestTimer($hash);
+    }
+    else {
+        return "Unknown argument $cmd, choose one of update:noArg";
+    }
 }
 
 sub WUup_Attr(@) {
@@ -213,8 +239,14 @@ sub WUup_send($) {
     $attr{$name}{unit_windspeed} = "km/h"
       if ( !defined( $attr{$name}{unit_windspeed} ) );
 
+    $attr{$name}{unit_solarradiation} = "lux"
+      if ( !defined( $attr{$name}{unit_solarradiation} ) );
+
+    $attr{$name}{round} = 4 if ( !defined( $attr{$name}{round} ) );
+
     my ( $data, $d, $r, $o );
-    my $a = $attr{$name};
+    my $a   = $attr{$name};
+    my $rnd = $attr{$name}{round};
     while ( my ( $key, $value ) = each(%$a) ) {
         next if substr( $key, 0, 2 ) ne 'wu';
         $key = substr( $key, 2, length($key) - 2 );
@@ -224,24 +256,35 @@ sub WUup_send($) {
             $value = ReadingsVal( $d, $r, 0 ) + $o;
         }
         if ( $key =~ /\w+f$/ ) {
-            $value = UConv::c2f( $value, 4 );
+            $value = UConv::c2f( $value, $rnd );
         }
         elsif ( $key =~ /\w+mph.*/ ) {
 
             if ( $attr{$name}{unit_windspeed} eq "m/s" ) {
                 Log3 $name, 5, "WUup ($name) - windspeed unit is m/s";
-                $value = UConv::kph2mph( ( UConv::mps2kph( $value, 4 ) ), 4 );
+                $value =
+                  UConv::kph2mph( ( UConv::mps2kph( $value, $rnd ) ), $rnd );
             }
             else {
                 Log3 $name, 5, "WUup ($name) - windspeed unit is km/h";
-                $value = UConv::kph2mph( $value, 4 );
+                $value = UConv::kph2mph( $value, $rnd );
             }
         }
         elsif ( $key eq "baromin" ) {
-            $value = UConv::hpa2inhg( $value, 4 );
+            $value = UConv::hpa2inhg( $value, $rnd );
         }
         elsif ( $key =~ /.*rainin$/ ) {
-            $value = UConv::mm2in( $value, 4 );
+            $value = UConv::mm2in( $value, $rnd );
+        }
+        elsif ( $key eq "solarradiation" ) {
+
+            if ( $attr{$name}{unit_solarradiation} eq "lux" ) {
+                Log3 $name, 5, "WUup ($name) - solarradiation unit is lux";
+                $value = ( $value / 126.7 );
+            }
+            else {
+                Log3 $name, 5, "WUup ($name) - solarradiation unit is W/m²";
+            }
         }
         $data .= "&$key=$value";
     }
@@ -258,7 +301,7 @@ sub WUup_send($) {
         }
         my $param = {
             url     => $url,
-            timeout => 4,
+            timeout => 6,
             hash    => $hash,
             method  => "GET",
             header =>
@@ -298,7 +341,8 @@ sub WUup_receive($) {
     }
     elsif ( $data ne "" ) {
         Log3 $name, 4, "WUup ($name) - server response: $data";
-        readingsSingleUpdate( $hash, "response", $data, undef );
+        readingsSingleUpdate( $hash, "state",    "active", undef );
+        readingsSingleUpdate( $hash, "response", $data,    undef );
     }
 }
 
@@ -322,20 +366,36 @@ sub WUup_receive($) {
 #            converted units rounded to 4 decimal places
 # 2017-03-16 implemented non-blocking mode
 # 2017-08-16 integrated RapidFire mode (thanks to Scooty66)
+# 2017-10-10 added windspdmph_avg2m, winddir_avg2m, windgustmph_10m,
+#            windgustdir_10m (thanks to Aeroschmelz for reminding me)
+#            timeout raised to 6s, fixed state error (thanks to mumpitzstuff)
+# 2017-10-16 fixed attributes
+# 2017-10-19 added set-command "update"
+# 2018-03-19 solarradiation calculated from lux to W/m² (thanks to dieter114)
+# 2018-04-10 added attribute round
+# 2018-04-13 added AqPM2.5 and AqPM10
+# 2018-08-15 added attribute unit_solarradiation
+# 2019-07-04 replaced link to API documentation
+# 2019-07-05 add Meta support
+# 2019-07-09 add WIKI to Meta data
 #
 ################################################################################
 
 =pod
+
+=encoding utf8
+
 =item helper
 =item summary sends weather data to Weather Underground
 =item summary_DE sendet Wetterdaten zu Weather Underground
+
 =begin html
 
-<a name="WUup"></a>
+<a name="WUup" id="WUup"></a>
 <h3>WUup</h3>
 <ul>
 
-    <a name="WUupdefine"></a>
+    <a name="WUupdefine" id="WUupdefine"></a>
     <b>Define</b>
     <ul>
 
@@ -349,15 +409,14 @@ sub WUup_receive($) {
     </ul>
     <br/><br/>
 
-    <a name="WUupset"></a>
+    <a name="WUupset" id="WUupset"></a>
     <b>Set-Commands</b><br/>
     <ul>
-        <br/>
-        - not implemented -<br/>
+        <li><b>update</b> - send data to Weather Underground</li>
     </ul>
     <br/><br/>
 
-    <a name="WUupget"></a>
+    <a name="WUupget" id="WUupget"></a>
     <b>Get-Commands</b><br/>
     <ul>
         <br/>
@@ -365,7 +424,7 @@ sub WUup_receive($) {
     </ul>
     <br/><br/>
 
-    <a name="WUupattr"></a>
+    <a name="WUupattr" id="WUupattr"></a>
     <b>Attributes</b><br/><br/>
     <ul>
         <li><b><a href="#readingFnAttributes">readingFnAttributes</a></b></li>
@@ -376,8 +435,10 @@ sub WUup_receive($) {
         <li><b>disable</b> - disables the module</li>
         <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
         <li><b>unit_windspeed</b> - change the units of your windspeed readings (m/s or km/h)</li>
+        <li><b>unit_solarradiation</b> - change the units of your solarradiation readings (lux or W/m&sup2;)</li>
+        <li><b>round</b> - round values to this number of decimals for calculation (default 4)</li>
         <li><b>wu....</b> - Attribute name corresponding to 
-<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">parameter name from api.</a> 
+<a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">parameter name from api.</a> 
             Each of these attributes contains information about weather data to be sent 
             in format <code>sensorName:readingName</code><br/>
             Example: <code>attr WUup wutempf outside:temperature</code> will 
@@ -389,24 +450,26 @@ sub WUup_receive($) {
             (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
         <u>The following information is supported:</u>
         <ul>
-            <li>winddir - [0-360 instantaneous wind direction]</li>
-            <li>windspeedmph - [mph instantaneous wind speed]</li>
-            <li>windgustmph - [mph current wind gust, using software specific time period]</li>
-            <li>windgustdir - [0-360 using software specific time period]</li>
-            <li>windspdmph_avg2m  - [mph 2 minute average wind speed mph]</li>
-            <li>winddir_avg2m - [0-360 2 minute average wind direction]</li>
-            <li>windgustmph_10m - [mph past 10 minutes wind gust mph]</li>
-            <li>windgustdir_10m - [0-360 past 10 minutes wind gust direction]</li>
-            <li>humidity - [&#37; outdoor humidity 0-100&#37;]</li>
-            <li>dewptf- [F outdoor dewpoint F]</li>
-            <li>tempf - [F outdoor temperature]</li>
-            <li>rainin - [rain inches over the past hour)] -- the accumulated rainfall in the past 60 min</li>
-            <li>dailyrainin - [rain inches so far today in local time]</li>
-            <li>baromin - [barometric pressure inches]</li>
-            <li>soiltempf - [F soil temperature]</li>
-            <li>soilmoisture - [&#37;]</li>
-            <li>solarradiation - [W/m&sup2;]</li>
+            <li>winddir - instantaneous wind direction (0-360) [&deg;]</li>
+            <li>windspeedmph - instantaneous wind speed ·[mph]</li>
+            <li>windgustmph - current wind gust, using software specific time period [mph]</li>
+            <li>windgustdir - current wind direction, using software specific time period [&deg;]</li>
+            <li>windspdmph_avg2m  - 2 minute average wind speed [mph]</li>
+            <li>winddir_avg2m - 2 minute average wind direction [&deg;]</li>
+            <li>windgustmph_10m - past 10 minutes wind gust [mph]</li>
+            <li>windgustdir_10m - past 10 minutes wind gust direction [&deg;]</li>
+            <li>humidity - outdoor humidity (0-100) [&#37;]</li>
+            <li>dewptf- outdoor dewpoint [F]</li>
+            <li>tempf - outdoor temperature [F]</li>
+            <li>rainin - rain over the past hour -- the accumulated rainfall in the past 60 min [in]</li>
+            <li>dailyrainin - rain so far today in local time [in]</li>
+            <li>baromin - barometric pressure [inHg]</li>
+            <li>soiltempf - soil temperature [F]</li>
+            <li>soilmoisture - soil moisture [&#37;]</li>
+            <li>solarradiation - solar radiation[W/m&sup2;]</li>
             <li>UV - [index]</li>
+            <li>AqPM2.5 - PM2.5 mass [&micro;g/m&sup3;]</li>
+            <li>AqPM10 - PM10 mass [&micro;g/m&sup3;]</li>
         </ul>
         </li>
     </ul>
@@ -423,20 +486,21 @@ sub WUup_receive($) {
     <b>Notes</b><br/><br/>
     <ul>
         <li>Find complete api description 
-<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">here</a></li>
+<a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">here</a></li>
         <li>Have fun!</li><br/>
     </ul>
 
 </ul>
 
 =end html
+
 =begin html_DE
 
-<a name="WUup"></a>
+<a name="WUup" id="WUup"></a>
 <h3>WUup</h3>
 <ul>
 
-    <a name="WUupdefine"></a>
+    <a name="WUupdefine" id="WUupdefine"></a>
     <b>Define</b>
     <ul>
 
@@ -449,15 +513,14 @@ sub WUup_receive($) {
     </ul>
     <br/><br/>
 
-    <a name="WUupset"></a>
+    <a name="WUupset" id="WUupset"></a>
     <b>Set-Befehle</b><br/>
     <ul>
-        <br/>
-        - keine -<br/>
+        <li><b>update</b> - sende Daten an Weather Underground</li>
     </ul>
     <br/><br/>
 
-    <a name="WUupget"></a>
+    <a name="WUupget" id="WUupget"></a>
     <b>Get-Befehle</b><br/>
     <ul>
         <br/>
@@ -465,7 +528,7 @@ sub WUup_receive($) {
     </ul>
     <br/><br/>
 
-    <a name="WUupattr"></a>
+    <a name="WUupattr" id="WUupattr"></a>
     <b>Attribute</b><br/><br/>
     <ul>
         <li><b><a href="#readingFnAttributes">readingFnAttributes</a></b></li>
@@ -476,8 +539,11 @@ sub WUup_receive($) {
         <li><b><a href="#disabledForIntervals">disabledForIntervals</a></b></li>
         <li><b>unit_windspeed</b> - gibt die Einheit der Readings für die
         Windgeschwindigkeiten an (m/s oder km/h)</li>
+        <li><b>unit_solarradiation</b> - gibt die Einheit der Readings für die
+        Sonneneinstrahlung an (lux oder W/m&sup2;)</li>
+        <li><b>round</b> - Anzahl der Nachkommastellen zur Berechnung (Standard 4)</li>
         <li><b>wu....</b> - Attributname entsprechend dem 
-<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">Parameternamen aus der API.</a><br />
+<a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">Parameternamen aus der API.</a><br />
         Jedes dieser Attribute enth&auml;lt Informationen &uuml;ber zu sendende Wetterdaten
         im Format <code>sensorName:readingName</code>.<br/>
         Beispiel: <code>attr WUup wutempf outside:temperature</code> definiert
@@ -488,24 +554,26 @@ sub WUup_receive($) {
         (&deg;C -> &deg;F; km/h(m/s) -> mph; mm -> in; hPa -> inHg)<br/><br/>
         <u>Unterst&uuml;tzte Angaben</u>
         <ul>
-            <li>Winddir - [0-360 momentane Windrichtung]</li>
-            <li>Windspeedmph - [mph momentane Windgeschwindigkeit]</li>
-            <li>Windgustmph - [mph aktuellen B&ouml;e, mit Software-spezifischem Zeitraum]</li>
-            <li>Windgustdir - [0-360 mit Software-spezifischer Zeit]</li>
-            <li>Windspdmph_avg2m - [mph durchschnittliche Windgeschwindigkeit innerhalb 2 Minuten]</li>
-            <li>Winddir_avg2m - [0-360 durchschnittliche Windrichtung innerhalb 2 Minuten]</li>
-            <li>Windgustmph_10m - [mph B&ouml;en der vergangenen 10 Minuten]</li>
-            <li>Windgustdir_10m - [0-360 Richtung der B&ouml;en der letzten 10 Minuten]</li>
-            <li>Feuchtigkeit - [&#37; Au&szlig;enfeuchtigkeit 0-100&#37;]</li>
-            <li>Dewptf- [F Taupunkt im Freien]</li>
-            <li>Tempf - [F Au&szlig;entemperatur]</li>
-            <li>Rainin - [in Regen in der vergangenen Stunde]</li>
-            <li>Dailyrainin - [in Regenmenge bisher heute]</li>
-            <li>Baromin - [inHg barometrischer Druck]</li>
-            <li>Soiltempf - [F Bodentemperatur]</li>
-            <li>Bodenfeuchtigkeit - [&#37;]</li>
-            <li>Solarradiation - [W/m&sup2;]</li>
+            <li>winddir - momentane Windrichtung (0-360) [&deg;]</li>
+            <li>windspeedmph - momentane Windgeschwindigkeit [mph]</li>
+            <li>windgustmph - aktuelle B&ouml;e, mit Software-spezifischem Zeitraum [mph]</li>
+            <li>windgustdir - aktuelle B&ouml;enrichtung, mit Software-spezifischer Zeitraum [&deg;]</li>
+            <li>windspdmph_avg2m - durchschnittliche Windgeschwindigkeit innerhalb 2 Minuten [mph]</li>
+            <li>winddir_avg2m - durchschnittliche Windrichtung innerhalb 2 Minuten [&deg;]</li>
+            <li>windgustmph_10m - B&ouml;en der vergangenen 10 Minuten [mph]</li>
+            <li>windgustdir_10m - Richtung der B&ouml;en der letzten 10 Minuten [&deg;]</li>
+            <li>humidity - Luftfeuchtigkeit im Freien (0-100) [&#37;]</li>
+            <li>dewptf- Taupunkt im Freien [F]</li>
+            <li>tempf - Au&szlig;entemperatur [F]</li>
+            <li>rainin - Regen in der vergangenen Stunde [in]</li>
+            <li>dailyrainin - Regenmenge bisher heute [in]</li>
+            <li>baromin - barometrischer Druck [inHg]</li>
+            <li>soiltempf - Bodentemperatur [F]</li>
+            <li>soilmoisture - Bodenfeuchtigkeit [&#37;]</li>
+            <li>solarradiation - Sonneneinstrahlung [W/m&sup2;]</li>
             <li>UV - [Index]</li>
+            <li>AqPM2.5 - Feinstaub PM2,5 [&micro;g/m&sup3;]</li>
+            <li>AqPM10 - Feinstaub PM10 [&micro;g/m&sup3;]</li>
         </ul>
         </li>
     </ul>
@@ -522,11 +590,67 @@ sub WUup_receive($) {
     <b>Notizen</b><br/><br/>
     <ul>
         <li>Die komplette API-Beschreibung findet sich 
-<a href="http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol">hier</a></li>
+<a href="https://feedback.weather.com/customer/en/portal/articles/2924682-pws-upload-protocol?b_id=17298">hier</a></li>
         <li>Viel Spa&szlig;!</li><br/>
     </ul>
 
 </ul>
 
 =end html_DE
+
+=for :application/json;q=META.json 59_WUup.pm
+{
+  "abstract": "sends weather data to Weather Underground",
+  "description": "This module provides connection to Weather Underground to send data from your own weather station.",
+  "x_lang": {
+    "de": {
+      "abstract": "sendet Wetterdaten zu Weather Underground",
+      "description": "Dieses Modul stellt eine Verbindung zu Weather Underground her, um Daten einer eigenen Wetterstation zu versenden"
+    }
+  },
+  "license": [
+    "gpl_2"
+  ],
+  "version": "v0.9.12",
+  "release_status": "stable",
+  "author": [
+    "Manfred Winter <mahowi@gmail.com>"
+  ],
+  "x_fhem_maintainer": [
+    "mahowi"
+  ],
+  "x_fhem_maintainer_github": [
+    "mahowi"
+  ],
+  "keywords": [
+    "fhem-mod",
+    "wunderground",
+    "pws",
+    "weather"
+  ],
+  "prereqs": {
+    "runtime": {
+      "requires": {
+        "FHEM": 0,
+        "FHEM::Meta": 0,
+        "HttpUtils": 0,
+        "UConv": 0,
+        "Time::HiRes": 0,
+        "perl": 5.014
+      },
+      "recommends": {
+      },
+      "suggests": {
+      }
+    }
+  },
+  "resources": {
+    "x_wiki" : {
+      "title" : "Wetter und Wettervorhersagen - Eigene Wetterdaten hochladen",
+      "web" : "https://wiki.fhem.de/wiki/Wetter_und_Wettervorhersagen#Eigene_Wetterdaten_hochladen"
+     }
+  }
+}
+=end :application/json;q=META.json
+
 =cut
