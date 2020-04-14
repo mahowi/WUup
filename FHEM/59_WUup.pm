@@ -96,12 +96,9 @@ sub WUup_Define {
 
     RemoveInternalTimer($hash);
 
-    if ($init_done) {
-        WUup_stateRequestTimer($hash);
-    }
-    else {
-        InternalTimer( gettimeofday(), 'WUup_stateRequestTimer', $hash, 0 );
-    }
+    $init_done
+        ? WUup_stateRequestTimer($hash)
+        : InternalTimer( gettimeofday(), 'WUup_stateRequestTimer', $hash, 0 );
 
     Log3( $name, 3, qq{WUup ($name): defined} );
 
