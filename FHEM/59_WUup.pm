@@ -613,8 +613,17 @@ sub WUup_receive {
     "x_wiki" : {
       "title" : "Wetter und Wettervorhersagen - Eigene Wetterdaten hochladen",
       "web" : "https://wiki.fhem.de/wiki/Wetter_und_Wettervorhersagen#Eigene_Wetterdaten_hochladen"
+     },
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/fhem/WUup.git",
+      "web": "https://github.com/mahowi/WUup/blob/master/FHEM/59_WUup.pm",
+      "x_branch": "master",
+      "x_filepath": "FHEM/",
+      "x_raw": "https://raw.githubusercontent.com/mahowi/WUup/master/FHEM/59_WUup.pm"
      }
-  }
+  }.
+  "x_support_status": "supported"
 }
 =end :application/json;q=META.json
 
