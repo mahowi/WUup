@@ -622,7 +622,7 @@ sub WUup_receive {
       "x_filepath": "FHEM/",
       "x_raw": "https://raw.githubusercontent.com/mahowi/WUup/master/FHEM/59_WUup.pm"
      }
-  }.
+  },
   "x_support_status": "supported"
 }
 =end :application/json;q=META.json
