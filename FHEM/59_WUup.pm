@@ -35,7 +35,7 @@ use HttpUtils;
 use UConv;
 use FHEM::Meta;
 
-my $version = q(0.9.17);
+my $version = q(0.9.18);
 
 ################################################################################
 #
@@ -208,13 +208,10 @@ sub WUup_send {
     my ($hash) = @_;
     my $name   = $hash->{NAME};
     my $ver    = $hash->{VERSION};
-    my $url    = q{};
-    if ( $hash->{INTERVAL} < 300 ) {
-        $url = $hash->{helper}{url_rf};
-    }
-    else {
-        $url = $hash->{helper}{url};
-    }
+    my $url =
+          $hash->{INTERVAL} < 300
+        ? $hash->{helper}{url_rf}
+        : $hash->{helper}{url};
     $url .= "?ID=$hash->{helper}{stationid}";
     $url .= "&PASSWORD=$hash->{helper}{password}";
     my $datestring = strftime "%F+%T", gmtime;
@@ -237,40 +234,19 @@ sub WUup_send {
             $o //= 0;
             $value = ReadingsVal( $d, $r, 0 ) + $o;
         }
-        if ( $key =~ m{\w+f \z}xms ) {
-            $value = UConv::c2f( $value, $rnd );
-        }
-        if ( $key =~ m{\w+mph [^\n]*}xms ) {
+        $value =
+            $key =~ m{\w+f \z}xms ? UConv::c2f( $value, $rnd )
+            : ( $key =~ m{\w+mph [^\n]*}xms )
+            && ( $unit_windspeed eq 'm/s' )
+            ? UConv::kph2mph( ( UConv::mps2kph( $value, $rnd ) ), $rnd )
+            : $key =~ m{\w+mph [^\n]*}xms ? UConv::kph2mph( $value, $rnd )
+            : $key eq 'baromin' ? UConv::hpa2inhg( $value, $rnd )
+            : $key =~ m{rainin \z}xms ? UConv::mm2in( $value, $rnd )
+            : ( $key eq 'solarradiation' )
+            && ( $unit_solarradiation eq 'lux' )
+            ? UConv::lux2wpsm( $value, $rnd )
+            : $value;
 
-            if ( $unit_windspeed eq 'm/s' ) {
-                Log3( $name, 5, qq{WUup ($name) - windspeed unit is m/s} );
-                $value =
-                    UConv::kph2mph( ( UConv::mps2kph( $value, $rnd ) ),
-                    $rnd );
-            }
-            else {
-                Log3( $name, 5, qq{WUup ($name) - windspeed unit is km/h} );
-                $value = UConv::kph2mph( $value, $rnd );
-            }
-        }
-        if ( $key eq 'baromin' ) {
-            $value = UConv::hpa2inhg( $value, $rnd );
-        }
-        if ( $key =~ m{rainin \z}xms ) {
-            $value = UConv::mm2in( $value, $rnd );
-        }
-        if ( $key eq 'solarradiation' ) {
-
-            if ( $unit_solarradiation eq 'lux' ) {
-                Log3( $name, 5,
-                    qq{WUup ($name) - solarradiation unit is lux} );
-                $value = UConv::lux2wpsm( $value, $rnd );
-            }
-            else {
-                Log3( $name, 5,
-                    qq{WUup ($name) - solarradiation unit is W/m²} );
-            }
-        }
         $data .= "&$key=$value";
     }
 
@@ -599,7 +575,7 @@ sub WUup_receive {
   "license": [
     "gpl_2"
   ],
-  "version": "v0.9.17",
+  "version": "v0.9.18",
   "release_status": "stable",
   "author": [
     "Manfred Winter <mahowi@gmail.com>"
