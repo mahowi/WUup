@@ -155,7 +155,7 @@ sub Attr {
     my $hash     = $defs{$name};
 
     if ( $attrName eq 'disable' ) {
-        if ( $cmd eq 'set' and $attrVal eq '1' ) {
+        if ( $cmd eq 'set' and $attrVal == 1 ) {
             readingsSingleUpdate( $hash, 'state', 'disabled', 1 );
             Log3( $name, 3, qq{WUup ($name) - disabled} );
         }
@@ -623,7 +623,6 @@ sub receive {
       "requires": {
         "FHEM": 0,
         "FHEM::Meta": 0,
-        "HttpUtils": 0,
         "UConv": 0,
         "POSIX": 0,
         "Time::HiRes": 0,
