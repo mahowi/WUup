@@ -31,7 +31,6 @@ use warnings;
 use 5.010;
 use Time::HiRes qw(gettimeofday);
 use POSIX qw(strftime);
-use HttpUtils;
 use UConv;
 use FHEM::Meta;
 use GPUtils qw(GP_Import GP_Export);
@@ -41,20 +40,22 @@ use GPUtils qw(GP_Import GP_Export);
 BEGIN {
     # Import from main context
     GP_Import(
-        qw( readingsSingleUpdate
-            RemoveInternalTimer
-            InternalTimer
-            Log3
-            IsDisabled
-            ReadingsVal
+        qw( attr
             AttrVal
+            CommandDeleteReading
+            defs
+            HttpUtils_NonblockingGet
+            init_done
+            InternalTimer
+            IsDisabled
+            Log3
+            readingFnAttributes
             readingsBeginUpdate
             readingsBulkUpdate
-            CommandDeleteReading
             readingsEndUpdate
-            readingFnAttributes
-            attr
-            defs )
+            readingsSingleUpdate
+            ReadingsVal
+            RemoveInternalTimer )
     );
 }
 
@@ -72,10 +73,10 @@ my $version = q(0.10.0);
 sub Initialize {
     my ($hash) = @_;
 
-    $hash->{DefFn}   = 'Define';
-    $hash->{UndefFn} = 'Undef';
-    $hash->{SetFn}   = 'Set';
-    $hash->{AttrFn}  = 'Attr';
+    $hash->{DefFn}   = \&Define;
+    $hash->{UndefFn} = \&Undef;
+    $hash->{SetFn}   = \&Set;
+    $hash->{AttrFn}  = \&Attr;
     $hash->{AttrList} =
           'disable:1,0 '
         . 'disabledForIntervals '
@@ -123,8 +124,8 @@ sub Define {
     RemoveInternalTimer($hash);
 
     $init_done
-        ? stateRequestTimer($hash)
-        : InternalTimer( gettimeofday(), 'stateRequestTimer', $hash, 0 );
+        ? &stateRequestTimer($hash)
+        : InternalTimer( gettimeofday(), \&stateRequestTimer, $hash, 0 );
 
     Log3( $name, 3, qq{WUup ($name): defined} );
 
@@ -142,7 +143,7 @@ sub Set {
     my $name = shift;
     my $cmd  = shift // return qq{set $name needs at least one argument};
 
-    return stateRequestTimer($hash) if ( $cmd eq 'update' );
+    return &stateRequestTimer($hash) if ( $cmd eq 'update' );
     return qq{Unknown argument $cmd, choose one of update:noArg};
 }
 
@@ -219,7 +220,7 @@ sub stateRequestTimer {
     }
 
     InternalTimer( gettimeofday() + $hash->{INTERVAL},
-        'stateRequestTimer', $hash, 1 );
+        \&stateRequestTimer, $hash, 1 );
 
     Log3( $name, 5,
         qq{Sub stateRequestTimer ($name) - Request Timer is called} );
