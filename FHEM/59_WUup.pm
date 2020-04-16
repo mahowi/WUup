@@ -97,8 +97,9 @@ sub Define {
     my $def  = shift;
 
     return $@ unless ( FHEM::Meta::SetInternals($hash) );
+    
     ## no critic ( ProhibitComplexVersion )
-    use version 0.77; our $VERSION = FHEM::Meta::Get( $hash, 'version' );
+    use version 0.77; our $VERSION = version->new( FHEM::Meta::Get( $hash, 'version' ) )->normal;
     ## use critic
 
     my @param = split( "[ \t][ \t]*", $def );
